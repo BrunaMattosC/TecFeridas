@@ -58,7 +58,7 @@ import cv2
 import numpy as np
 
 import config
-from utils import get_logger, overlay_mask_on_image
+from utils import escrever_imagem, get_logger, ler_imagem, overlay_mask_on_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "recriar_mascaras_kaggle.log")
 
@@ -127,33 +127,6 @@ RAZAO_SUSPEITA = 0.75
 SEM_ALTERACAO = "SEM_ALTERACAO"
 MASCARA_EXPANDIDA = "MASCARA_EXPANDIDA"
 REVISAO_NECESSARIA = "REVISAO_NECESSARIA"
-
-
-# --------------------------------------------------------------------------- #
-# I/O tolerante a caminhos não-ASCII
-# --------------------------------------------------------------------------- #
-# ``cv2.imread``/``imwrite`` repassam o caminho para a API ANSI do Windows e
-# falham em silêncio com qualquer caractere fora do ASCII. Como
-# ``config.BASE_DIR`` é absoluto, basta o projeto estar em "Área de
-# Trabalho" para toda leitura devolver ``None``. As funções abaixo movem o
-# acesso ao disco para o Python e deixam ao OpenCV só a decodificação.
-
-def ler_imagem(caminho: Path, flags: int = cv2.IMREAD_COLOR) -> Optional[np.ndarray]:
-    """Lê uma imagem tolerando acentos no caminho."""
-    try:
-        dados = np.fromfile(str(caminho), dtype=np.uint8)
-    except OSError:
-        return None
-    return cv2.imdecode(dados, flags) if dados.size else None
-
-
-def escrever_imagem(caminho: Path, imagem: np.ndarray) -> None:
-    """Grava uma imagem tolerando acentos no caminho."""
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    ok, buffer = cv2.imencode(caminho.suffix or ".png", imagem)
-    if not ok:
-        raise RuntimeError(f"Falha ao codificar {caminho}")
-    buffer.tofile(str(caminho))
 
 
 # --------------------------------------------------------------------------- #

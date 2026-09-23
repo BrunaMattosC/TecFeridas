@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from utils import get_logger
+from utils import get_logger, ler_imagem
 
 # --------------------------------------------------------------------------- #
 # Import opcional da pilha de deep learning
@@ -381,12 +381,12 @@ class WoundDataset(Dataset):
     def __getitem__(self, idx: int):
         img_path, mask_path = self.pairs[idx]
 
-        image = cv2.imread(str(img_path))
+        image = ler_imagem(img_path)
         if image is None:
             raise FileNotFoundError(f"Falha ao ler imagem: {img_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             raise FileNotFoundError(f"Falha ao ler máscara: {mask_path}")
         mask = (mask > 127).astype(np.float32)
@@ -420,7 +420,7 @@ def explore_dataset(pairs: Optional[List[Tuple[Path, Path]]] = None) -> pd.DataF
 
     rows = []
     for img_path, mask_path in pairs:
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             continue
         h, w = mask.shape

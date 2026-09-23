@@ -23,7 +23,7 @@ import numpy as np
 
 import config
 from dataset import contar_imagens, explore_dataset, list_image_mask_pairs
-from utils import get_logger, overlay_mask_on_image
+from utils import get_logger, ler_imagem, overlay_mask_on_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "explore_data.log")
 
@@ -54,8 +54,8 @@ def plot_random_examples(n: int = 6, out_path=config.FIGURES_DIR / "exemplos_ale
 
     fig, axes = plt.subplots(2, len(sample), figsize=(4 * len(sample), 8))
     for i, (img_path, mask_path) in enumerate(sample):
-        image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        image = cv2.cvtColor(ler_imagem(img_path), cv2.COLOR_BGR2RGB)
+        mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         overlay = overlay_mask_on_image(image, mask)
 
         axes[0, i].imshow(image)

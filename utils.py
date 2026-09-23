@@ -210,5 +210,65 @@ def save_image(path: Path, image: np.ndarray) -> None:
         path: caminho de destino.
         image: imagem RGB uint8.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+    escrever_imagem(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+
+# --------------------------------------------------------------------------- #
+# I/O de imagem tolerante a caminhos não-ASCII
+# --------------------------------------------------------------------------- #
+# ``cv2.imread`` e ``cv2.imwrite`` repassam o caminho para a API ANSI do
+# Windows e falham com qualquer caractere fora do ASCII — em silêncio: o
+# read devolve ``None`` e o write devolve ``False``, sem exceção.
+#
+# Isso não é hipotético para este projeto. ``config.BASE_DIR`` é sempre
+# ABSOLUTO (``Path(__file__).resolve()``), então basta o projeto estar em
+# "Área de Trabalho", "Documentos do João" ou qualquer pasta acentuada para
+# que TODA leitura de imagem do pipeline devolva ``None`` — treino,
+# inferência, avaliação e exploração deixam de funcionar de uma vez.
+#
+# A solução move o acesso ao disco para o Python, que trata Unicode
+# corretamente, e deixa para o OpenCV apenas decodificar os bytes já em
+# memória. O comportamento em caminhos ASCII é idêntico ao de antes.
+
+def ler_imagem(caminho: Path, flags: int = cv2.IMREAD_COLOR) -> Optional[np.ndarray]:
+    """Lê uma imagem do disco tolerando acentos no caminho.
+
+    Substitui ``cv2.imread`` com o mesmo contrato.
+
+    Args:
+        caminho: arquivo a ler.
+        flags: mesma semântica do parâmetro de ``cv2.imread``
+            (ex.: ``cv2.IMREAD_GRAYSCALE``).
+
+    Returns:
+        A imagem decodificada, ou ``None`` se o arquivo não existir, não
+        puder ser lido ou não for uma imagem válida.
+    """
+    try:
+        dados = np.fromfile(str(caminho), dtype=np.uint8)
+    except OSError:
+        return None
+    if dados.size == 0:
+        return None
+    return cv2.imdecode(dados, flags)
+
+
+def escrever_imagem(caminho: Path, imagem: np.ndarray) -> None:
+    """Grava uma imagem no disco tolerando acentos no caminho.
+
+    Substitui ``cv2.imwrite``. A imagem é gravada como está, sem conversão
+    de cor: quem tem um array RGB deve usar :func:`save_image`.
+
+    Args:
+        caminho: destino; os diretórios são criados se necessário.
+        imagem: array a gravar, no formato que o OpenCV espera (BGR para
+            imagens coloridas).
+
+    Raises:
+        RuntimeError: se o OpenCV não conseguir codificar a imagem.
+    """
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    ok, buffer = cv2.imencode(caminho.suffix or ".png", imagem)
+    if not ok:
+        raise RuntimeError(f"Falha ao codificar a imagem para {caminho}")
+    buffer.tofile(str(caminho))
