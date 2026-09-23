@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 import torch
-from torchmetrics import Accuracy, F1Score, JaccardIndex, Precision, Recall
+from torchmetrics import Accuracy, JaccardIndex, Precision, Recall
 from torchmetrics.classification import BinaryF1Score
 
 

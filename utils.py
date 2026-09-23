@@ -8,10 +8,14 @@ Funções utilitárias compartilhadas por todos os scripts do projeto:
 - funções de visualização (overlay de máscara, grids de exemplos);
 - helpers genéricos de I/O.
 
-``torch`` é importado sob demanda (dentro de :func:`seed_everything` e
-:func:`get_device`) para que as rotinas puramente de imagem — usadas
-pela medição em :mod:`measure` — possam ser importadas e testadas sem
-carregar toda a pilha de deep learning.
+``torch`` é importado sob demanda (dentro de :func:`seed_everything`)
+para que as rotinas puramente de imagem — usadas pela medição em
+:mod:`measure` — possam ser importadas e testadas sem carregar toda a
+pilha de deep learning.
+
+A escolha de dispositivo (GPU/CPU) não vive aqui: ela é resolvida por
+:func:`hardware.resolver_dispositivo`, o único ponto de decisão do
+projeto.
 """
 
 from __future__ import annotations
@@ -20,13 +24,10 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import Optional, Sequence
 
 import cv2
 import numpy as np
-
-if TYPE_CHECKING:  # apenas para type checking — não importa torch em runtime
-    import torch
 
 
 # --------------------------------------------------------------------------- #
@@ -94,46 +95,6 @@ def get_logger(name: str, log_file: Optional[Path] = None) -> logging.Logger:
         logger.addHandler(file_handler)
 
     return logger
-
-
-# --------------------------------------------------------------------------- #
-# Device
-# --------------------------------------------------------------------------- #
-
-def get_device(
-    preferred: str = "cuda",
-    exigir_gpu: Optional[bool] = None,
-    silencioso: bool = False,
-) -> "torch.device":
-    """Retorna o device a ser usado, delegando a :mod:`hardware`.
-
-    Esta função é apenas um atalho compatível com o código já existente:
-    a decisão real (e a verificação de que a GPU está mesmo utilizável)
-    vive em :func:`hardware.resolver_dispositivo`, para que exista um
-    único ponto de decisão no projeto.
-
-    Diferente da versão anterior, **não há fallback silencioso**: se a
-    máquina tem GPU e o PyTorch não consegue usá-la, um aviso explicando o
-    motivo é impresso; com ``REQUIRE_GPU`` ligado, o erro é levantado.
-
-    Args:
-        preferred: device desejado ("cuda"/"auto" ou "cpu").
-        exigir_gpu: sobrescreve ``config.DEVICE_CFG.require_gpu``. Use
-            ``False`` em rotinas de inferência, que continuam úteis em CPU.
-        silencioso: suprime o aviso de GPU ociosa.
-
-    Returns:
-        Instância de :class:`torch.device`.
-
-    Raises:
-        hardware.GPUIndisponivelError: se a GPU for exigida e não estiver
-            disponível.
-    """
-    from hardware import resolver_dispositivo
-
-    return resolver_dispositivo(
-        preferido=preferred, exigir_gpu=exigir_gpu, silencioso=silencioso
-    )
 
 
 # --------------------------------------------------------------------------- #

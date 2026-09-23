@@ -36,7 +36,6 @@ from typing import List, Optional, Sequence, Tuple, Union
 
 import cv2
 import numpy as np
-import pandas as pd
 
 import config
 from utils import draw_contour, get_logger, overlay_mask_on_image
@@ -669,21 +668,6 @@ def _apply_scale(
 # --------------------------------------------------------------------------- #
 # Etapa 11 — Relatório tabular
 # --------------------------------------------------------------------------- #
-
-def build_measurement_report(records: List[dict]) -> pd.DataFrame:
-    """Etapa 11 — Monta o DataFrame de relatório por imagem.
-
-    Args:
-        records: lista de dicionários, cada um contendo ao menos
-            ``nome_imagem`` e os campos de :class:`WoundMeasurements`,
-            podendo incluir também ``iou`` e ``dice`` quando disponíveis
-            (comparação contra a máscara real).
-
-    Returns:
-        DataFrame pronto para ser salvo em CSV.
-    """
-    return pd.DataFrame(records)
-
 
 def measurements_to_row(image_name: str, measurements: WoundMeasurements, **extra) -> dict:
     """Converte um :class:`WoundMeasurements` em uma linha de DataFrame (dict).

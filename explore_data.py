@@ -19,7 +19,6 @@ import random
 
 import cv2
 import matplotlib.pyplot as plt
-import numpy as np
 
 import config
 from dataset import contar_imagens, explore_dataset, list_image_mask_pairs

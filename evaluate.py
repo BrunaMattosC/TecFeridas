@@ -160,29 +160,6 @@ def plot_precision_recall_curve(y_true: np.ndarray, y_prob: np.ndarray, out_path
     logger.info("Curva Precision-Recall salva em %s", out_path)
 
 
-def plot_training_curves(history_csv: Path, out_path: Path) -> None:
-    """Etapa 13 - Plota curvas de treino/validacao (loss e dice) a partir do historico salvo por train.py."""
-    df = pd.read_csv(history_csv)
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    axes[0].plot(df["epoch"], df["train_loss"], label="treino")
-    axes[0].plot(df["epoch"], df["val_loss"], label="validacao")
-    axes[0].set_title("Loss por epoca")
-    axes[0].set_xlabel("Epoca")
-    axes[0].legend()
-
-    axes[1].plot(df["epoch"], df["train_dice"], label="treino")
-    axes[1].plot(df["epoch"], df["val_dice"], label="validacao")
-    axes[1].set_title("Dice por epoca")
-    axes[1].set_xlabel("Epoca")
-    axes[1].legend()
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-    logger.info("Curvas de treinamento salvas em %s", out_path)
-
-
 def evaluate_model(checkpoint_path: Path) -> Dict[str, float]:
     """Executa a avaliacao completa do modelo no conjunto de teste.
 

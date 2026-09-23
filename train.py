@@ -68,11 +68,6 @@ _SEP = "=" * 66
 # treino, validacao, avaliacao e inferencia usem exatamente a mesma regra.
 # Os nomes abaixo permanecem como atalhos compativeis com o codigo anterior.
 
-def make_grad_scaler(enabled: bool, device: torch.device | None = None, dtype=None):
-    """Cria o ``GradScaler`` adequado ao dispositivo e ao dtype de AMP."""
-    return criar_grad_scaler(device or torch.device("cuda"), enabled, dtype)
-
-
 def autocast_context(enabled: bool, device: torch.device | None = None, dtype=None):
     """Devolve o contexto de autocast compativel com esta versao do torch."""
     return contexto_autocast(device or torch.device("cuda"), enabled, dtype)

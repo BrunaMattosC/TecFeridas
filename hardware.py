@@ -696,10 +696,6 @@ def banner_hardware(device: "torch.device", info: Optional[InfoHardware] = None)
     return "\n".join(linhas)
 
 
-def imprimir_banner_hardware(device: "torch.device", info: Optional[InfoHardware] = None) -> None:
-    print(banner_hardware(device, info))
-
-
 # --------------------------------------------------------------------------- #
 # Ajuste dos backends (TF32, cuDNN)
 # --------------------------------------------------------------------------- #
@@ -921,18 +917,6 @@ def _utilizacao_via_smi(device: "torch.device") -> Optional[float]:
         return float(saida.strip().splitlines()[device.index or 0])
     except (ValueError, IndexError):
         return None
-
-
-def utilizacao_gpu(device: "torch.device") -> Optional[float]:
-    """Percentual de ocupacao do nucleo grafico, ou ``None`` se indisponivel.
-
-    Tenta primeiro a NVML e cai para ``nvidia-smi`` se a NVML nao estiver
-    acessivel.
-    """
-    if device.type != "cuda":
-        return None
-    valor = _utilizacao_via_nvml(device)
-    return valor if valor is not None else _utilizacao_via_smi(device)
 
 
 class AmostradorGPU:
