@@ -40,7 +40,7 @@ from measure import (
     wounds_to_rows,
 )
 from predict import load_model_from_checkpoint, predict_mask
-from utils import get_logger, overlay_mask_on_image, save_image
+from utils import escrever_imagem, get_logger, overlay_mask_on_image, save_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "batch_inference.log")
 
@@ -100,7 +100,7 @@ def run_batch_inference(
 
         # A máscara é gravada em tons de cinza (2-D), então não passa pela
         # conversão RGB->BGR de ``save_image``.
-        cv2.imwrite(str(output_dir / f"{image_path.stem}_mask.png"), mask * 255)
+        escrever_imagem(output_dir / f"{image_path.stem}_mask.png", mask * 255)
         overlay = overlay_mask_on_image(image, mask)
         save_image(output_dir / f"{image_path.stem}_overlay.png", overlay)
 

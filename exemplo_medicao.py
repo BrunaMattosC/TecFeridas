@@ -38,7 +38,7 @@ from measure import (
     measure_wounds,
     wounds_to_rows,
 )
-from utils import save_image
+from utils import ler_imagem, save_image
 
 
 def escolher_imagem(nome: str | None) -> str:
@@ -79,12 +79,12 @@ def main() -> int:
 
     nome = escolher_imagem(args.imagem)
 
-    imagem = cv2.imread(str(config.IMAGES_DIR / nome))
+    imagem = ler_imagem(config.IMAGES_DIR / nome)
     if imagem is None:
         print("ERRO: falha ao ler a imagem %s" % nome)
         return 1
     imagem = cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
-    mascara = cv2.imread(str(config.MASKS_DIR / nome), cv2.IMREAD_GRAYSCALE)
+    mascara = ler_imagem(config.MASKS_DIR / nome, cv2.IMREAD_GRAYSCALE)
 
     # Limpa UMA vez e reusa a mesma mascara na medicao e no desenho, para
     # que os numeros do CSV e a imagem anotada nunca discordem.

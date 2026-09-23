@@ -39,7 +39,7 @@ import cv2
 import numpy as np
 
 import config
-from utils import draw_contour, get_logger, overlay_mask_on_image
+from utils import draw_contour, get_logger, ler_imagem, overlay_mask_on_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "measure.log")
 
@@ -922,7 +922,7 @@ if __name__ == "__main__":
     pairs = list_image_mask_pairs()
     if pairs:
         _, mask_path = pairs[0]
-        sample_mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        sample_mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         measurements = measure_wounds(sample_mask, pixels_por_cm=config.DEFAULT_PIXELS_POR_CM)
         logger.info("Medição de exemplo (%s):\n%s", mask_path.name,
                     format_measurements_text(measurements))

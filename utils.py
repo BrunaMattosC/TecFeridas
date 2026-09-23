@@ -98,6 +98,58 @@ def get_logger(name: str, log_file: Optional[Path] = None) -> logging.Logger:
 
 
 # --------------------------------------------------------------------------- #
+# I/O de imagem tolerante a caminhos não-ASCII
+# --------------------------------------------------------------------------- #
+# ``cv2.imread``/``cv2.imwrite`` repassam o caminho para a API ANSI do
+# Windows e falham quando ele contém qualquer caractere fora do ASCII —
+# sem exceção: o read devolve ``None`` e o write devolve ``False``.
+#
+# Isso não é hipotético para este projeto: ``config.BASE_DIR`` é sempre
+# ABSOLUTO (``Path(__file__).resolve()``), então basta o projeto estar em
+# "Área de Trabalho", "Documentos do João" ou qualquer pasta acentuada
+# para que TODA leitura de imagem do pipeline devolva ``None``.
+#
+# As funções abaixo movem o acesso ao disco para o Python (que lida com
+# Unicode corretamente) e deixam para o OpenCV apenas a decodificação dos
+# bytes já em memória.
+
+def ler_imagem(caminho: Path, flags: int = cv2.IMREAD_COLOR) -> Optional[np.ndarray]:
+    """Lê uma imagem do disco tolerando acentos no caminho.
+
+    Args:
+        caminho: arquivo a ler.
+        flags: mesma semântica do parâmetro de ``cv2.imread``.
+
+    Returns:
+        A imagem decodificada, ou ``None`` se o arquivo não existir ou
+        não for uma imagem válida — mesmo contrato de ``cv2.imread``.
+    """
+    try:
+        dados = np.fromfile(str(caminho), dtype=np.uint8)
+    except OSError:
+        return None
+    if dados.size == 0:
+        return None
+    return cv2.imdecode(dados, flags)
+
+
+def escrever_imagem(caminho: Path, imagem: np.ndarray) -> None:
+    """Grava uma imagem no disco tolerando acentos no caminho.
+
+    A imagem é gravada como está, sem conversão de cor: quem tem um array
+    RGB deve usar :func:`save_image`.
+
+    Raises:
+        RuntimeError: se o OpenCV não conseguir codificar a imagem.
+    """
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    ok, buffer = cv2.imencode(caminho.suffix or ".png", imagem)
+    if not ok:
+        raise RuntimeError(f"Falha ao codificar a imagem para {caminho}")
+    buffer.tofile(str(caminho))
+
+
+# --------------------------------------------------------------------------- #
 # Visualização
 # --------------------------------------------------------------------------- #
 
@@ -171,8 +223,7 @@ def save_image(path: Path, image: np.ndarray) -> None:
         path: caminho de destino.
         image: imagem RGB uint8.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+    escrever_imagem(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
 
 def save_figure(fig, out_path: Path, descricao: str, logger: Optional[logging.Logger] = None) -> None:

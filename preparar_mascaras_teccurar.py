@@ -46,7 +46,7 @@ import numpy as np
 
 import config
 from measure import clean_mask
-from utils import get_logger
+from utils import escrever_imagem, get_logger, ler_imagem
 
 logger = get_logger(__name__, config.LOGS_DIR / "preparar_mascaras_teccurar.log")
 
@@ -67,19 +67,6 @@ VERDE_HSV_MAX = np.array([75, 255, 255], dtype=np.uint8)
 # Área mínima da anotação, em fração da imagem. Abaixo disso o resultado é
 # quase certamente respingo de compressão, não marcação do avaliador.
 AREA_MINIMA_RELATIVA = 0.0005
-
-
-def ler_imagem(caminho: Path) -> Optional[np.ndarray]:
-    """Lê uma imagem tolerando acentos no caminho.
-
-    ``cv2.imread`` falha silenciosamente com caracteres não-ASCII no
-    Windows (devolve ``None``) — e todos os nomes aqui têm acento.
-    ``fromfile`` + ``imdecode`` contorna, lendo os bytes pelo Python.
-    """
-    dados = np.fromfile(str(caminho), dtype=np.uint8)
-    if dados.size == 0:
-        return None
-    return cv2.imdecode(dados, cv2.IMREAD_UNCHANGED)
 
 
 def extrair_mascara_verde(anotada: np.ndarray) -> np.ndarray:
@@ -265,11 +252,7 @@ def preparar(gravar: bool = True) -> int:
             # A imagem é copiada byte a byte: nenhuma recompressão, nenhuma
             # alteração de pixel no material original.
             shutil.copy2(original_path, IMAGENS_SAIDA / ("%s%s" % (nome, original_path.suffix.lower())))
-            destino_mascara = MASCARAS_SAIDA / ("%s.png" % nome)
-            ok, buffer = cv2.imencode(".png", (mascara * 255).astype(np.uint8))
-            if not ok:
-                raise RuntimeError("Falha ao codificar a máscara de %s" % anotada_path.name)
-            buffer.tofile(str(destino_mascara))
+            escrever_imagem(MASCARAS_SAIDA / ("%s.png" % nome), (mascara * 255).astype(np.uint8))
 
         linhas.append({
             "nome": nome,
