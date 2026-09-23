@@ -173,3 +173,31 @@ def save_image(path: Path, image: np.ndarray) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+
+def save_figure(fig, out_path: Path, descricao: str, logger: Optional[logging.Logger] = None) -> None:
+    """Salva uma figura matplotlib, fecha-a e registra o caminho.
+
+    Fechar a figura é o que impede o vazamento de memória em rotinas que
+    geram muitos gráficos em sequência — esquecê-lo é justamente o erro
+    que centralizar este trecho evita.
+
+    ``matplotlib`` é importado aqui dentro, e não no topo do módulo, para
+    que :mod:`measure` continue importável com apenas ``cv2``/``numpy``:
+    matplotlib pertence ao grupo de dependências de gráficos, não ao de
+    medição.
+
+    Args:
+        fig: figura a salvar.
+        out_path: caminho de destino do arquivo.
+        descricao: texto usado na mensagem de log (ex.: "Curva ROC").
+        logger: logger onde registrar; se ``None``, nada é registrado.
+    """
+    import matplotlib.pyplot as plt
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    if logger is not None:
+        logger.info("%s salva em %s", descricao, out_path)

@@ -45,6 +45,13 @@ for _dir in (
 #   https://www.kaggle.com/datasets/leoscode/wound-segmentation-images
 KAGGLE_DATASET_SLUG = "leoscode/wound-segmentation-images"
 
+# Extensões de imagem reconhecidas ao varrer pastas. Vive aqui, e não em
+# ``dataset``, para que os scripts que não usam a pilha de deep learning
+# (ex.: ``exemplo_medicao``) não precisem importar aquele módulo só por
+# esta tupla. ``verificar_ambiente`` mantém a própria cópia de propósito:
+# ele roda sem nenhuma dependência do projeto, por design.
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
+
 
 # --------------------------------------------------------------------------- #
 # Reprodutibilidade

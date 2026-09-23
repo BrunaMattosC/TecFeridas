@@ -30,6 +30,7 @@ escala sozinho.
 
 from __future__ import annotations
 
+import argparse
 import math
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Sequence, Tuple, Union
@@ -190,6 +191,33 @@ def scale_from_options(
     if config.DEFAULT_PIXELS_POR_CM:
         return PixelScale.from_pixels_per_cm(config.DEFAULT_PIXELS_POR_CM)
     return None
+
+
+def adicionar_args_escala(parser: argparse.ArgumentParser) -> None:
+    """Registra em ``parser`` as opções de escala aceitas pelos CLIs.
+
+    Mantida junto de :func:`scale_from_options` para que as flags e sua
+    interpretação não possam divergir: ``predict`` e ``batch_inference``
+    expõem exatamente as mesmas opções.
+    """
+    parser.add_argument("--pixels-por-cm", type=float, default=None,
+                        help="Fator de escala pixels/cm (opcional).")
+    parser.add_argument("--pixels-por-mm", type=float, default=None,
+                        help="Fator de escala pixels/mm (opcional).")
+    parser.add_argument("--referencia-pixels", type=float, default=None,
+                        help="Tamanho, em pixels, de um objeto de referência na imagem.")
+    parser.add_argument("--referencia-cm", type=float, default=None,
+                        help="Tamanho real, em cm, do objeto de referência informado.")
+
+
+def scale_from_args(args: argparse.Namespace) -> Optional[PixelScale]:
+    """Constrói a :class:`PixelScale` a partir dos argumentos já parseados."""
+    return scale_from_options(
+        pixels_por_cm=args.pixels_por_cm,
+        pixels_por_mm=args.pixels_por_mm,
+        referencia_pixels=args.referencia_pixels,
+        referencia_cm=args.referencia_cm,
+    )
 
 
 # --------------------------------------------------------------------------- #

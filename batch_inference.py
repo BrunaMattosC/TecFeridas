@@ -26,20 +26,21 @@ import pandas as pd
 from tqdm import tqdm
 
 import config
-from dataset import IMAGE_EXTENSIONS
+from config import IMAGE_EXTENSIONS
+from hardware import ajustar_backends, banner_hardware, resolver_dispositivo, texto_memoria_gpu
 from measure import (
     PixelScale,
+    adicionar_args_escala,
     annotate_measurements,
     clean_mask,
     measure_wound,
     measurements_to_row,
     measure_wounds,
-    scale_from_options,
+    scale_from_args,
     wounds_to_rows,
 )
-from hardware import ajustar_backends, banner_hardware, resolver_dispositivo, texto_memoria_gpu
 from predict import load_model_from_checkpoint, predict_mask
-from utils import get_logger, overlay_mask_on_image
+from utils import get_logger, overlay_mask_on_image, save_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "batch_inference.log")
 
@@ -97,19 +98,18 @@ def run_batch_inference(
             logger.error("Falha ao processar %s: %s", image_path.name, exc)
             continue
 
+        # A máscara é gravada em tons de cinza (2-D), então não passa pela
+        # conversão RGB->BGR de ``save_image``.
         cv2.imwrite(str(output_dir / f"{image_path.stem}_mask.png"), mask * 255)
         overlay = overlay_mask_on_image(image, mask)
-        cv2.imwrite(str(output_dir / f"{image_path.stem}_overlay.png"), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+        save_image(output_dir / f"{image_path.stem}_overlay.png", overlay)
 
         measured_mask = clean_mask(mask)
         wounds = measure_wounds(measured_mask, pixels_por_cm=pixels_por_cm, cleanup=False)
         wound_records.extend(wounds_to_rows(image_path.name, wounds))
 
         annotated = annotate_measurements(image, wounds, mask=measured_mask)
-        cv2.imwrite(
-            str(output_dir / f"{image_path.stem}_medicoes.png"),
-            cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR),
-        )
+        save_image(output_dir / f"{image_path.stem}_medicoes.png", annotated)
 
         try:
             measurements = measure_wound(mask, pixels_por_cm=pixels_por_cm)
@@ -141,16 +141,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--input-dir", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--output-dir", type=str, default=None)
-    parser.add_argument("--pixels-por-cm", type=float, default=None)
-    parser.add_argument("--pixels-por-mm", type=float, default=None)
-    parser.add_argument(
-        "--referencia-pixels", type=float, default=None,
-        help="Tamanho, em pixels, de um objeto de referência presente nas imagens.",
-    )
-    parser.add_argument(
-        "--referencia-cm", type=float, default=None,
-        help="Tamanho real, em cm, do objeto de referência informado.",
-    )
+    adicionar_args_escala(parser)
     return parser.parse_args()
 
 
@@ -160,10 +151,5 @@ if __name__ == "__main__":
         input_dir=Path(args.input_dir),
         checkpoint_path=Path(args.checkpoint),
         output_dir=Path(args.output_dir) if args.output_dir else None,
-        pixels_por_cm=scale_from_options(
-            pixels_por_cm=args.pixels_por_cm,
-            pixels_por_mm=args.pixels_por_mm,
-            referencia_pixels=args.referencia_pixels,
-            referencia_cm=args.referencia_cm,
-        ),
+        pixels_por_cm=scale_from_args(args),
     )
