@@ -392,24 +392,6 @@ def _remove_small_components(mask: np.ndarray, cfg: config.MeasurementConfig) ->
     return keep[labels].astype(np.uint8)
 
 
-def _largest_component_mask(mask: np.ndarray) -> np.ndarray:
-    """Retorna uma máscara binária contendo apenas o maior componente conectado.
-
-    Args:
-        mask: máscara binária (0/1 ou 0/255).
-
-    Returns:
-        Máscara binária (0/1) com apenas o maior componente conectado.
-    """
-    mask_bin = _binarize(mask)
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
-    if num_labels <= 1:  # apenas o fundo
-        return mask_bin
-
-    largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-    return (labels == largest_label).astype(np.uint8)
-
-
 # --------------------------------------------------------------------------- #
 # Etapa 9b — Extração de características geométricas
 # --------------------------------------------------------------------------- #
@@ -568,15 +550,24 @@ def measure_wound(
         ValueError: se a máscara não contiver nenhum pixel de primeiro plano.
     """
     mask_bin = _binarize(mask)
-    total_pixels = mask_bin.shape[0] * mask_bin.shape[1]
 
-    num_labels, _, _, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
-    num_components = max(num_labels - 1, 0)
-
+    # A checagem de máscara vazia vem antes da rotulação: é barata e evita
+    # percorrer a imagem inteira para depois descartar o resultado.
     if mask_bin.sum() == 0:
         raise ValueError("Máscara vazia: nenhuma região de ferida encontrada.")
 
-    main_mask = _largest_component_mask(mask_bin)
+    total_pixels = mask_bin.shape[0] * mask_bin.shape[1]
+
+    # Uma única passagem de componentes conectados serve aos dois usos:
+    # contar os componentes e isolar o maior. Antes, a imagem era rotulada
+    # duas vezes (aqui e dentro de um helper) para obter esses dois dados.
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
+    num_components = max(num_labels - 1, 0)
+
+    # Máscara não vazia sempre produz ao menos um componente além do fundo.
+    largest_label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    main_mask = (labels == largest_label).astype(np.uint8)
+
     result = _measure_component(main_mask, total_pixels, num_components, wound_id=1)
     if result is None:  # pragma: no cover - máscara não vazia sempre gera contorno
         raise ValueError("Máscara vazia: nenhuma região de ferida encontrada.")

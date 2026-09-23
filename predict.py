@@ -13,6 +13,7 @@ comparação:
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -32,7 +33,17 @@ from hardware import (
     para_dispositivo,
     resolver_dispositivo,
 )
-from measure import adicionar_args_escala, scale_from_args
+from measure import (
+    PixelScale,
+    adicionar_args_escala,
+    annotate_measurements,
+    clean_mask,
+    format_measurements_text,
+    measure_wound,
+    measure_wounds,
+    scale_from_args,
+    wounds_to_rows,
+)
 from models import build_model
 from utils import get_logger, overlay_mask_on_image, save_image
 
@@ -50,9 +61,7 @@ def load_model_from_checkpoint(checkpoint_path: Path, device: torch.device) -> t
         Modelo em modo de avaliação (``eval()``), pronto para inferência.
     """
     checkpoint = torch.load(checkpoint_path, map_location=device)
-
-    from config import ModelConfig
-    model_cfg = ModelConfig(**checkpoint["model_config"])
+    model_cfg = config.ModelConfig(**checkpoint["model_config"])
 
     model = build_model(model_cfg).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -174,7 +183,7 @@ def predict_single_image(
     checkpoint_path: Path,
     ground_truth_path: Optional[Path] = None,
     pixels_por_cm: Optional[float] = None,
-    scale: Optional["PixelScale"] = None,
+    scale: Optional[PixelScale] = None,
 ) -> dict:
     """Pipeline completo de predição para uma única imagem: segmenta,
     mede cada ferida e salva as visualizações.
@@ -196,17 +205,6 @@ def predict_single_image(
         acrescido da chave ``"feridas"`` com uma linha por ferida
         detectada e de ``"num_feridas"``.
     """
-    from dataclasses import asdict
-
-    from measure import (
-        annotate_measurements,
-        clean_mask,
-        format_measurements_text,
-        measure_wound,
-        measure_wounds,
-        wounds_to_rows,
-    )
-
     # Inferência em uma única imagem continua útil em CPU, então aqui a GPU
     # não é exigida — mas, se houver GPU ociosa, o aviso aparece do mesmo
     # jeito (nada de fallback silencioso).
