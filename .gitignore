@@ -67,7 +67,8 @@ Fotos TecFeridas/
 *.mov
 *.mp4
 
-# Máscaras recriadas a partir do dataset: derivam das fotografias clínicas.
+# Máscaras recriadas a partir do dataset: derivam das fotografias clínicas e
+# são recriáveis com `python recriar_mascaras_kaggle.py`.
 TecCurar_NewMasks/
 
 # Fotografias das moedas de referência e tabela de dimensões oficiais.
