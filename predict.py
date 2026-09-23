@@ -33,7 +33,7 @@ from hardware import (
     resolver_dispositivo,
 )
 from models import build_model
-from utils import get_logger, overlay_mask_on_image
+from utils import get_logger, ler_imagem, overlay_mask_on_image, save_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "predict.log")
 
@@ -84,7 +84,7 @@ def predict_mask(
     Returns:
         Tupla ``(imagem_original_rgb, mascara_binaria_no_tamanho_original)``.
     """
-    image_bgr = cv2.imread(str(image_path))
+    image_bgr = ler_imagem(image_path)
     if image_bgr is None:
         raise FileNotFoundError(f"Não foi possível ler a imagem: {image_path}")
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
@@ -219,7 +219,7 @@ def predict_single_image(
 
     ground_truth = None
     if ground_truth_path is not None and ground_truth_path.exists():
-        ground_truth = cv2.imread(str(ground_truth_path), cv2.IMREAD_GRAYSCALE)
+        ground_truth = ler_imagem(ground_truth_path, cv2.IMREAD_GRAYSCALE)
 
     effective_scale = scale if scale is not None else pixels_por_cm
 
@@ -234,14 +234,8 @@ def predict_single_image(
     visualize_prediction(image, predicted_mask, ground_truth, save_path, annotated=annotated)
 
     overlay = overlay_mask_on_image(image, predicted_mask)
-    cv2.imwrite(
-        str(config.PREDICTIONS_DIR / f"{image_path.stem}_overlay.png"),
-        cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR),
-    )
-    cv2.imwrite(
-        str(config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.png"),
-        cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR),
-    )
+    save_image(config.PREDICTIONS_DIR / f"{image_path.stem}_overlay.png", overlay)
+    save_image(config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.png", annotated)
 
     rows = wounds_to_rows(image_path.name, wounds)
     csv_path = config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.csv"

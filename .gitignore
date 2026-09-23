@@ -67,6 +67,12 @@ Fotos TecFeridas/
 *.mov
 *.mp4
 
+# Máscaras recriadas a partir do dataset: derivam das fotografias clínicas.
+TecCurar_NewMasks/
+
+# Fotografias das moedas de referência e tabela de dimensões oficiais.
+Moedas Parâmetro/
+
 # ---------------------------------------------------------------------------
 # Credenciais e segredos
 # ---------------------------------------------------------------------------
