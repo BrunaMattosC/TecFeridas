@@ -1,0 +1,7 @@
+# Dependencias usadas apenas para desenvolvimento/testes.
+# As dependencias de execucao ficam em requirements.txt.
+-r requirements.txt
+
+# Limite superior pelo mesmo motivo das demais: uma major nova do pytest
+# pode mudar comportamento de fixtures e quebrar a suite sem aviso.
+pytest>=8.0.0,<10.0.0

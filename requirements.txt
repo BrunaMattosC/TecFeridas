@@ -1,0 +1,50 @@
+# Dependencias de execucao.
+#
+# As faixas abaixo tem limite SUPERIOR por decisao deliberada. A versao
+# anterior deste arquivo usava apenas ">=", e isso quebrou o projeto: o
+# NumPy 2.0 removeu np.trapz, que evaluate.py usava. Com limite superior,
+# uma nova versao major nao entra sozinha em uma instalacao nova.
+#
+# Para atualizar uma faixa, suba o limite, rode `pytest tests/ -q` e so
+# entao registre a mudanca.
+#
+# Versoes verificadas nesta base estao em requirements-verificado.txt.
+
+# --- Deep learning -------------------------------------------------------- #
+#
+# ATENCAO: instalar torch por aqui, do PyPI, traz a build CPU-only em
+# Windows/Linux -- ela IGNORA a GPU, sem nenhum erro visivel, e o treino cai
+# para CPU. Para usar a GPU, instale torch/torchvision ANTES deste arquivo,
+# a partir do indice CUDA correspondente ao seu driver:
+#
+#     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#
+# Rode `python hardware.py` para descobrir qual indice esta maquina precisa.
+torch>=2.1.0,<3.0.0
+torchvision>=0.16.0,<1.0.0
+segmentation-models-pytorch>=0.3.3,<0.6.0
+torchmetrics>=1.3.0,<2.0.0
+
+# --- Visao computacional / dados ------------------------------------------ #
+# albumentations 2.x ainda aceita ShiftScaleRotate (com aviso de
+# depreciacao); 3.x pode remove-lo. Ver dataset.get_train_transforms.
+albumentations>=1.4.0,<3.0.0
+opencv-python-headless>=4.9.0,<6.0.0
+numpy>=1.26.0,<3.0.0
+pandas>=2.1.0,<4.0.0
+
+# --- Graficos e metricas -------------------------------------------------- #
+matplotlib>=3.8.0,<4.0.0
+scikit-learn>=1.4.0,<2.0.0
+
+# --- Infraestrutura ------------------------------------------------------- #
+tensorboard>=2.15.0,<3.0.0
+tqdm>=4.66.0,<5.0.0
+
+# kaggle >= 2.0 e necessario para aceitar o token moderno KAGGLE_API_TOKEN
+# (formato KGAT_...). Versoes 1.x aceitam apenas KAGGLE_USERNAME/KAGGLE_KEY
+# ou o arquivo ~/.kaggle/kaggle.json.
+kaggle>=2.0.0,<3.0.0
+
+# NOTA: scikit-image constava aqui, mas nenhum modulo do projeto o importa.
+# Foi removido para nao pesar a instalacao. Se voltar a ser usado, readicione.

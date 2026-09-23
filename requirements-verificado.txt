@@ -1,0 +1,54 @@
+# Combinacao de versoes EXATAS verificada com a suite completa passando
+# (54 testes, incluindo os 9 de integracao).
+#
+#   Ambiente da verificacao : Windows 10, Python 3.14.6, CPU
+#   Data                    : 06/08/2026
+#   Resultado               : pytest tests/ -q  ->  54 passed in 29.64s
+#
+# Use este arquivo quando quiser reproduzir EXATAMENTE este ambiente:
+#
+#     pip install -r requirements-verificado.txt
+#
+# Para uma instalacao normal, prefira requirements.txt, que usa faixas e
+# tolera versoes mais novas dentro do mesmo major.
+#
+# ATENCAO - torch e torchvision NAO sao instalaveis a partir deste arquivo:
+# eles vem de um indice proprio da PyTorch, e o indice escolhido decide se
+# voce treina em GPU ou em CPU. Instale-os ANTES, em um comando separado.
+#
+# COM GPU NVIDIA (o caso normal). Escolha o indice pela versao de CUDA que
+# o SEU DRIVER suporta -- ela aparece no canto superior direito do
+# `nvidia-smi`. Um wheel cu130 com driver de CUDA 12.x instala sem erro e
+# depois reporta torch.cuda.is_available() == False:
+#
+#     # driver com CUDA 12.x
+#     pip install torch==2.13.0 torchvision==0.28.0 \
+#         --index-url https://download.pytorch.org/whl/cu126
+#     # driver com CUDA 13.x (exige driver >= 580)
+#     pip install torch==2.13.0 torchvision==0.28.0 \
+#         --index-url https://download.pytorch.org/whl/cu130
+#
+#     pip install -r requirements-verificado.txt
+#
+# SEM GPU (ou GPU antiga). A variante CPU e bem menor:
+#
+#     pip install torch==2.13.0 torchvision==0.28.0 \
+#         --index-url https://download.pytorch.org/whl/cpu
+#     pip install -r requirements-verificado.txt
+#
+# `python hardware.py` diz qual indice usar nesta maquina.
+
+# torch==2.13.0+cu126             # ver nota acima (era +cpu; a build CPU-only
+# torchvision==0.28.0+cu126       # ignora a GPU, por mais que o codigo peca)
+
+segmentation-models-pytorch==0.5.0
+torchmetrics==1.9.0
+albumentations==2.0.8
+opencv-python-headless==5.0.0.93
+numpy==2.5.1
+pandas==3.0.5
+matplotlib==3.11.1
+scikit-learn==1.9.0
+tensorboard==2.21.0
+tqdm==4.67.3
+kaggle==2.2.4
