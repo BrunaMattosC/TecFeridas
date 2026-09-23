@@ -30,6 +30,7 @@ import cv2
 import pandas as pd
 
 import config
+from config import IMAGE_EXTENSIONS
 from measure import (
     annotate_measurements,
     clean_mask,
@@ -37,8 +38,7 @@ from measure import (
     measure_wounds,
     wounds_to_rows,
 )
-
-IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
+from utils import save_image
 
 
 def escolher_imagem(nome: str | None) -> str:
@@ -105,7 +105,7 @@ def main() -> int:
         imagem, feridas, mask=limpa, draw_labels=not args.sem_rotulos
     )
     caminho_png = saida / ("%s_medicoes.png" % Path(nome).stem)
-    cv2.imwrite(str(caminho_png), cv2.cvtColor(anotada, cv2.COLOR_RGB2BGR))
+    save_image(caminho_png, anotada)
 
     caminho_csv = saida / ("%s_medicoes.csv" % Path(nome).stem)
     pd.DataFrame(wounds_to_rows(nome, feridas)).to_csv(caminho_csv, index=False)

@@ -13,6 +13,7 @@ comparação:
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -32,8 +33,19 @@ from hardware import (
     para_dispositivo,
     resolver_dispositivo,
 )
+from measure import (
+    PixelScale,
+    adicionar_args_escala,
+    annotate_measurements,
+    clean_mask,
+    format_measurements_text,
+    measure_wound,
+    measure_wounds,
+    scale_from_args,
+    wounds_to_rows,
+)
 from models import build_model
-from utils import get_logger, overlay_mask_on_image
+from utils import get_logger, overlay_mask_on_image, save_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "predict.log")
 
@@ -49,9 +61,7 @@ def load_model_from_checkpoint(checkpoint_path: Path, device: torch.device) -> t
         Modelo em modo de avaliação (``eval()``), pronto para inferência.
     """
     checkpoint = torch.load(checkpoint_path, map_location=device)
-
-    from config import ModelConfig
-    model_cfg = ModelConfig(**checkpoint["model_config"])
+    model_cfg = config.ModelConfig(**checkpoint["model_config"])
 
     model = build_model(model_cfg).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -173,7 +183,7 @@ def predict_single_image(
     checkpoint_path: Path,
     ground_truth_path: Optional[Path] = None,
     pixels_por_cm: Optional[float] = None,
-    scale: Optional["PixelScale"] = None,
+    scale: Optional[PixelScale] = None,
 ) -> dict:
     """Pipeline completo de predição para uma única imagem: segmenta,
     mede cada ferida e salva as visualizações.
@@ -195,17 +205,6 @@ def predict_single_image(
         acrescido da chave ``"feridas"`` com uma linha por ferida
         detectada e de ``"num_feridas"``.
     """
-    from dataclasses import asdict
-
-    from measure import (
-        annotate_measurements,
-        clean_mask,
-        format_measurements_text,
-        measure_wound,
-        measure_wounds,
-        wounds_to_rows,
-    )
-
     # Inferência em uma única imagem continua útil em CPU, então aqui a GPU
     # não é exigida — mas, se houver GPU ociosa, o aviso aparece do mesmo
     # jeito (nada de fallback silencioso).
@@ -234,14 +233,8 @@ def predict_single_image(
     visualize_prediction(image, predicted_mask, ground_truth, save_path, annotated=annotated)
 
     overlay = overlay_mask_on_image(image, predicted_mask)
-    cv2.imwrite(
-        str(config.PREDICTIONS_DIR / f"{image_path.stem}_overlay.png"),
-        cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR),
-    )
-    cv2.imwrite(
-        str(config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.png"),
-        cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR),
-    )
+    save_image(config.PREDICTIONS_DIR / f"{image_path.stem}_overlay.png", overlay)
+    save_image(config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.png", annotated)
 
     rows = wounds_to_rows(image_path.name, wounds)
     csv_path = config.PREDICTIONS_DIR / f"{image_path.stem}_medicoes.csv"
@@ -266,31 +259,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--image", type=str, required=True, help="Caminho da imagem de entrada.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Caminho do checkpoint do modelo.")
     parser.add_argument("--ground-truth", type=str, default=None, help="Máscara real (opcional).")
-    parser.add_argument("--pixels-por-cm", type=float, default=None, help="Fator de escala pixels/cm (opcional).")
-    parser.add_argument("--pixels-por-mm", type=float, default=None, help="Fator de escala pixels/mm (opcional).")
-    parser.add_argument(
-        "--referencia-pixels", type=float, default=None,
-        help="Tamanho, em pixels, de um objeto de referência na imagem.",
-    )
-    parser.add_argument(
-        "--referencia-cm", type=float, default=None,
-        help="Tamanho real, em cm, do objeto de referência informado.",
-    )
+    adicionar_args_escala(parser)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    from measure import scale_from_options
-
     args = _parse_args()
     predict_single_image(
         image_path=Path(args.image),
         checkpoint_path=Path(args.checkpoint),
         ground_truth_path=Path(args.ground_truth) if args.ground_truth else None,
-        scale=scale_from_options(
-            pixels_por_cm=args.pixels_por_cm,
-            pixels_por_mm=args.pixels_por_mm,
-            referencia_pixels=args.referencia_pixels,
-            referencia_cm=args.referencia_cm,
-        ),
+        scale=scale_from_args(args),
     )

@@ -68,11 +68,6 @@ _SEP = "=" * 66
 # treino, validacao, avaliacao e inferencia usem exatamente a mesma regra.
 # Os nomes abaixo permanecem como atalhos compativeis com o codigo anterior.
 
-def make_grad_scaler(enabled: bool, device: torch.device | None = None, dtype=None):
-    """Cria o ``GradScaler`` adequado ao dispositivo e ao dtype de AMP."""
-    return criar_grad_scaler(device or torch.device("cuda"), enabled, dtype)
-
-
 def autocast_context(enabled: bool, device: torch.device | None = None, dtype=None):
     """Devolve o contexto de autocast compativel com esta versao do torch."""
     return contexto_autocast(device or torch.device("cuda"), enabled, dtype)
@@ -254,33 +249,28 @@ def run_epoch(
     return result
 
 
-def train_model(
-    architecture: str | None = None,
-    encoder_name: str | None = None,
-    epochs: int | None = None,
-) -> Path:
-    """Executa o pipeline completo de treinamento e retorna o caminho do melhor checkpoint.
+def _configurar_saida_padrao() -> None:
+    """Volta o stdout para buffer de linha.
 
-    Args:
-        architecture: sobrescreve ``config.MODEL_CFG.architecture`` se informado.
-        encoder_name: sobrescreve ``config.MODEL_CFG.encoder_name`` se informado.
-        epochs: sobrescreve ``config.TRAIN_CFG.epochs`` se informado.
-
-    Returns:
-        Caminho do arquivo ``.pt`` contendo os pesos do melhor modelo.
+    Os banners e o relatório por época saem em stdout; os logs, em stderr.
+    Com a saída redirecionada para um arquivo, o stdout vira buffer de
+    bloco e o banner apareceria DEPOIS dos logs, fora de ordem. Buffer de
+    linha mantém o relatório legível em `python train.py > treino.log 2>&1`.
     """
-    # Os banners e o relatório por época saem em stdout; os logs, em stderr.
-    # Com a saída redirecionada para um arquivo, o stdout vira buffer de
-    # bloco e o banner apareceria DEPOIS dos logs, fora de ordem. Voltar
-    # para buffer de linha mantém o relatório legível em
-    # `python train.py > treino.log 2>&1`.
     try:
         sys.stdout.reconfigure(line_buffering=True)
     except (AttributeError, ValueError):  # stdout substituído (ex.: pytest)
         pass
 
-    seed_everything(config.SEED)
 
+def _resolver_configuracoes(
+    architecture: str | None, encoder_name: str | None, epochs: int | None
+) -> tuple[config.ModelConfig, config.TrainConfig]:
+    """Copia as configurações globais e aplica as sobrescritas recebidas.
+
+    A cópia profunda evita que uma chamada com parâmetros personalizados
+    contamine ``config.MODEL_CFG``/``config.TRAIN_CFG`` para as seguintes.
+    """
     model_cfg = copy.deepcopy(config.MODEL_CFG)
     train_cfg = copy.deepcopy(config.TRAIN_CFG)
     if architecture:
@@ -289,11 +279,24 @@ def train_model(
         model_cfg.encoder_name = encoder_name
     if epochs:
         train_cfg.epochs = epochs
+    return model_cfg, train_cfg
 
-    # ------------------------------------------------------------------ #
-    # 1. Dispositivo: decidido em um único lugar, com aviso alto se a GPU
-    #    existir mas não estiver utilizável (e erro, se REQUIRE_GPU).
-    # ------------------------------------------------------------------ #
+
+def _preparar_dispositivo(
+    model_cfg: config.ModelConfig, train_cfg: config.TrainConfig
+) -> tuple[torch.device, bool, "torch.dtype | None"]:
+    """Resolve o dispositivo, ajusta backends, imprime o cabeçalho e confere a GPU.
+
+    O dispositivo é decidido em um único lugar, com aviso alto se a GPU
+    existir mas não estiver utilizável (e erro, se ``REQUIRE_GPU``). Antes
+    de qualquer época começar, a GPU executa uma operação de verdade.
+
+    Returns:
+        Tupla ``(device, usar_amp, amp_dtype)``.
+
+    Raises:
+        RuntimeError: se o device for CUDA mas a verificação real falhar.
+    """
     device = resolver_dispositivo()
     info = obter_hardware()
     ajustar_backends(device)
@@ -314,10 +317,6 @@ def train_model(
     print("Epochs: %d" % train_cfg.epochs)
     print()
 
-    # ------------------------------------------------------------------ #
-    # 2. Verificação REAL: a GPU executa uma operação de verdade antes de
-    #    qualquer época começar (item 8 do escopo).
-    # ------------------------------------------------------------------ #
     if device.type == "cuda":
         if not verificar_uso_real_da_gpu(device):
             raise RuntimeError(
@@ -329,12 +328,142 @@ def train_model(
     print(_SEP)
     print()
 
+    return device, usar_amp, amp_dtype
+
+
+def _relatar_epoca(
+    epoch: int,
+    total_epocas: int,
+    rotulo_device: str,
+    device: torch.device,
+    train_result: Dict[str, float],
+    val_result: Dict[str, float],
+    elapsed: float,
+    uso_gpu: str,
+    mem: Dict[str, float],
+    ocupacao_media: float | None,
+) -> None:
+    """Relata a época para quem acompanha: log (stderr) e relatório (stdout)."""
+    logger.info(
+        "Época %02d/%d | %.1fs | train_loss=%.4f train_dice=%.4f | "
+        "val_loss=%.4f val_dice=%.4f val_iou=%.4f",
+        epoch, total_epocas, elapsed,
+        train_result["loss"], train_result["dice"],
+        val_result["loss"], val_result["dice"], val_result["iou"],
+    )
+    logger.info(
+        "         Device: %s | GPU Usage: %s | GPU Memory: %s | "
+        "treino %.1fs (%.3fs/batch) | validação %.1fs (%.3fs/batch)",
+        rotulo_device, uso_gpu,
+        texto_memoria_gpu(device) if mem else "n/a (CPU)",
+        train_result["tempo_total"], train_result["tempo_por_batch"],
+        val_result["tempo_total"], val_result["tempo_por_batch"],
+    )
+
+    print("Train Loss: %.5f" % train_result["loss"])
+    print("Val Loss: %.5f" % val_result["loss"])
+    print("Val Dice: %.5f" % val_result["dice"])
+    if mem:
+        print("GPU Memory: %.0f MB alocada / %.0f MB reservada / pico %.0f MB"
+              % (mem["alocada"], mem["reservada"], mem["pico_alocado"]))
+        print("GPU Usage: %s" % uso_gpu)
+    print("Time: %.1fs (%.3fs/batch no treino)"
+          % (elapsed, train_result["tempo_por_batch"]))
+    print()
+
+    # Alerta explícito de fallback: se em algum momento o modelo deixar
+    # de estar na GPU esperada, isso aparece aqui e não meses depois.
+    if device.type == "cuda" and ocupacao_media is not None and ocupacao_media < 5:
+        logger.warning(
+            "ATENÇÃO: a GPU foi detectada, porém sua ocupação média nesta "
+            "época foi de apenas %.0f%%. Verifique se o carregamento de "
+            "dados (num_workers) não está sendo o gargalo.", ocupacao_media
+        )
+
+
+def _registrar_epoca(
+    writer: SummaryWriter,
+    epoch: int,
+    rotulo_device: str,
+    optimizer: torch.optim.Optimizer,
+    train_result: Dict[str, float],
+    val_result: Dict[str, float],
+    elapsed: float,
+    mem: Dict[str, float],
+    ocupacao_media: float | None,
+) -> Dict[str, float]:
+    """Grava as métricas da época no TensorBoard e devolve a linha do histórico.
+
+    ``device`` e os tempos ficam no CSV de propósito: é o que permite
+    comparar depois, objetivamente, o custo por época em CPU x GPU.
+    """
+    for split_name, result in (("train", train_result), ("val", val_result)):
+        for metric_name, value in result.items():
+            writer.add_scalar(f"{metric_name}/{split_name}", value, epoch)
+    writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
+    writer.add_scalar("tempo/epoca_segundos", elapsed, epoch)
+    if mem:
+        writer.add_scalar("gpu/memoria_alocada_mb", mem["alocada"], epoch)
+        writer.add_scalar("gpu/memoria_reservada_mb", mem["reservada"], epoch)
+        if ocupacao_media is not None:
+            writer.add_scalar("gpu/utilizacao_percent", ocupacao_media, epoch)
+
+    row = {"epoch": epoch, "device": rotulo_device, "tempo_epoca_s": elapsed}
+    row.update({f"train_{k}": v for k, v in train_result.items()})
+    row.update({f"val_{k}": v for k, v in val_result.items()})
+    if mem:
+        row["gpu_memoria_alocada_mb"] = mem["alocada"]
+        row["gpu_memoria_reservada_mb"] = mem["reservada"]
+        row["gpu_memoria_pico_mb"] = mem["pico_alocado"]
+        row["gpu_utilizacao_media_percent"] = ocupacao_media
+    return row
+
+
+def _salvar_checkpoint(
+    caminho: Path,
+    model: torch.nn.Module,
+    model_cfg: config.ModelConfig,
+    epoch: int,
+    val_dice: float,
+) -> None:
+    """Salva os pesos do melhor modelo junto da configuração que o gerou."""
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "model_config": model_cfg.__dict__,
+            "epoch": epoch,
+            "val_dice": val_dice,
+        },
+        caminho,
+    )
+    logger.info("Novo melhor modelo salvo (val_dice=%.4f) em %s", val_dice, caminho)
+
+
+def train_model(
+    architecture: str | None = None,
+    encoder_name: str | None = None,
+    epochs: int | None = None,
+) -> Path:
+    """Executa o pipeline completo de treinamento e retorna o caminho do melhor checkpoint.
+
+    Args:
+        architecture: sobrescreve ``config.MODEL_CFG.architecture`` se informado.
+        encoder_name: sobrescreve ``config.MODEL_CFG.encoder_name`` se informado.
+        epochs: sobrescreve ``config.TRAIN_CFG.epochs`` se informado.
+
+    Returns:
+        Caminho do arquivo ``.pt`` contendo os pesos do melhor modelo.
+    """
+    _configurar_saida_padrao()
+    seed_everything(config.SEED)
+
+    model_cfg, train_cfg = _resolver_configuracoes(architecture, encoder_name, epochs)
+    device, usar_amp, amp_dtype = _preparar_dispositivo(model_cfg, train_cfg)
+
     loaders = build_dataloaders(device)
 
-    # ------------------------------------------------------------------ #
-    # 3. Modelo -> dispositivo, com conferência de que TODOS os parâmetros
-    #    e buffers foram de fato movidos.
-    # ------------------------------------------------------------------ #
+    # Modelo -> dispositivo, com conferência de que TODOS os parâmetros e
+    # buffers foram de fato movidos.
     model = build_model(model_cfg).to(device)
     conferir_modelo_no_dispositivo(model, device, nome="modelo de segmentação")
     logger.info("Modelo em %s (%d parâmetros treináveis)",
@@ -393,78 +522,20 @@ def train_model(
         uso_gpu = amostrador.resumo()
         mem = memoria_gpu(device)
 
-        logger.info(
-            "Época %02d/%d | %.1fs | train_loss=%.4f train_dice=%.4f | "
-            "val_loss=%.4f val_dice=%.4f val_iou=%.4f",
-            epoch, train_cfg.epochs, elapsed,
-            train_result["loss"], train_result["dice"],
-            val_result["loss"], val_result["dice"], val_result["iou"],
-        )
-        logger.info(
-            "         Device: %s | GPU Usage: %s | GPU Memory: %s | "
-            "treino %.1fs (%.3fs/batch) | validação %.1fs (%.3fs/batch)",
-            rotulo_device, uso_gpu,
-            texto_memoria_gpu(device) if mem else "n/a (CPU)",
-            train_result["tempo_total"], train_result["tempo_por_batch"],
-            val_result["tempo_total"], val_result["tempo_por_batch"],
+        _relatar_epoca(
+            epoch, train_cfg.epochs, rotulo_device, device,
+            train_result, val_result, elapsed, uso_gpu, mem, amostrador.media,
         )
 
-        print("Train Loss: %.5f" % train_result["loss"])
-        print("Val Loss: %.5f" % val_result["loss"])
-        print("Val Dice: %.5f" % val_result["dice"])
-        if mem:
-            print("GPU Memory: %.0f MB alocada / %.0f MB reservada / pico %.0f MB"
-                  % (mem["alocada"], mem["reservada"], mem["pico_alocado"]))
-            print("GPU Usage: %s" % uso_gpu)
-        print("Time: %.1fs (%.3fs/batch no treino)"
-              % (elapsed, train_result["tempo_por_batch"]))
-        print()
-
-        # Alerta explícito de fallback: se em algum momento o modelo deixar
-        # de estar na GPU esperada, isso aparece aqui e não meses depois.
-        if device.type == "cuda" and amostrador.media is not None and amostrador.media < 5:
-            logger.warning(
-                "ATENÇÃO: a GPU foi detectada, porém sua ocupação média nesta "
-                "época foi de apenas %.0f%%. Verifique se o carregamento de "
-                "dados (num_workers) não está sendo o gargalo.", amostrador.media
-            )
-
-        for split_name, result in (("train", train_result), ("val", val_result)):
-            for metric_name, value in result.items():
-                writer.add_scalar(f"{metric_name}/{split_name}", value, epoch)
-        writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
-        writer.add_scalar("tempo/epoca_segundos", elapsed, epoch)
-        if mem:
-            writer.add_scalar("gpu/memoria_alocada_mb", mem["alocada"], epoch)
-            writer.add_scalar("gpu/memoria_reservada_mb", mem["reservada"], epoch)
-            if amostrador.media is not None:
-                writer.add_scalar("gpu/utilizacao_percent", amostrador.media, epoch)
-
-        # ``device`` e os tempos ficam no CSV de propósito: é o que permite
-        # comparar depois, objetivamente, o custo por época em CPU x GPU.
-        row = {"epoch": epoch, "device": rotulo_device, "tempo_epoca_s": elapsed}
-        row.update({f"train_{k}": v for k, v in train_result.items()})
-        row.update({f"val_{k}": v for k, v in val_result.items()})
-        if mem:
-            row["gpu_memoria_alocada_mb"] = mem["alocada"]
-            row["gpu_memoria_reservada_mb"] = mem["reservada"]
-            row["gpu_memoria_pico_mb"] = mem["pico_alocado"]
-            row["gpu_utilizacao_media_percent"] = amostrador.media
-        history.append(row)
+        history.append(_registrar_epoca(
+            writer, epoch, rotulo_device, optimizer,
+            train_result, val_result, elapsed, mem, amostrador.media,
+        ))
 
         improved = early_stopping.step(val_result["dice"])
         if improved:
             best_val_dice = val_result["dice"]
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "model_config": model_cfg.__dict__,
-                    "epoch": epoch,
-                    "val_dice": best_val_dice,
-                },
-                best_ckpt_path,
-            )
-            logger.info("Novo melhor modelo salvo (val_dice=%.4f) em %s", best_val_dice, best_ckpt_path)
+            _salvar_checkpoint(best_ckpt_path, model, model_cfg, epoch, best_val_dice)
 
         if early_stopping.should_stop:
             logger.info("Early stopping acionado na época %d.", epoch)
