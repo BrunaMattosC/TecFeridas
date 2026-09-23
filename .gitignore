@@ -96,3 +96,8 @@ secrets.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Saídas de calibração, validação e relatórios. Contêm fotografias clínicas
+# e material delas derivado; recriáveis com `python calibrar_moedas.py`,
+# `python comparar_mascaras_relatorio.py` e pela própria interface.
+Resultados/
