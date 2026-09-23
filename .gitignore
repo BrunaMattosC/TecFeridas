@@ -37,6 +37,8 @@ htmlcov/
 # train.py`, outputs/ e logs/ de cada execução. Somam mais de 1 GB.
 # Apenas a estrutura de diretórios é versionada, via arquivos .gitkeep.
 # ---------------------------------------------------------------------------
+# Inclui dataset/masks_teccurar e dataset/masks_recriadas, que são saídas
+# geradas a partir do dataset e recriáveis pelos scripts do projeto.
 dataset/**
 checkpoints/**
 outputs/**
