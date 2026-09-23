@@ -76,9 +76,7 @@ def _exigir_deep_learning(recurso: str) -> None:
 
 logger = get_logger(__name__, config.LOGS_DIR / "dataset.log")
 
-# Reexportado de :mod:`config` para não quebrar ``from dataset import
-# IMAGE_EXTENSIONS``, já usado por outros módulos.
-IMAGE_EXTENSIONS = config.IMAGE_EXTENSIONS
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 
 
 # --------------------------------------------------------------------------- #

@@ -979,9 +979,9 @@ que o split treino/validação/teste seja sempre o mesmo entre execuções.
   `sklearn.metrics.auc`, que faz a mesma integração trapezoidal, já era
   dependência do projeto e independe da versão do NumPy.
 - **`train.py` usa AMP compatível com as duas gerações do PyTorch.** As
-  funções `hardware.criar_grad_scaler()` e `autocast_context()` escolhem
-  entre `torch.amp` (2.4+) e `torch.cuda.amp` (anterior) em tempo de
-  execução. Verificado em torch 2.13: zero avisos de depreciação.
+  funções `make_grad_scaler()` e `autocast_context()` escolhem entre
+  `torch.amp` (2.4+) e `torch.cuda.amp` (anterior) em tempo de execução.
+  Verificado em torch 2.13: zero avisos de depreciação.
 - **`dataset.py` não exige mais a pilha de deep learning para baixar
   dados.** Os imports de `torch` e `albumentations` passaram a ser
   tolerantes (`DEEP_LEARNING_DISPONIVEL`). Download, organização,

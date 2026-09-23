@@ -19,10 +19,11 @@ import random
 
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 
 import config
-from dataset import explore_dataset, list_image_mask_pairs
-from utils import get_logger, overlay_mask_on_image, save_figure
+from dataset import contar_imagens, explore_dataset, list_image_mask_pairs
+from utils import get_logger, overlay_mask_on_image
 
 logger = get_logger(__name__, config.LOGS_DIR / "explore_data.log")
 
@@ -40,7 +41,10 @@ def plot_area_distribution(df, out_path=config.FIGURES_DIR / "distribuicao_area.
     axes[1].set_xlabel("% da imagem")
     axes[1].set_ylabel("Frequência")
 
-    save_figure(fig, out_path, "Histograma de área", logger)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Histograma de área salvo em %s", out_path)
 
 
 def plot_random_examples(n: int = 6, out_path=config.FIGURES_DIR / "exemplos_aleatorios.png") -> None:
@@ -62,13 +66,21 @@ def plot_random_examples(n: int = 6, out_path=config.FIGURES_DIR / "exemplos_ale
         axes[1, i].set_title("máscara sobreposta", fontsize=8)
         axes[1, i].axis("off")
 
-    save_figure(fig, out_path, "Grid de exemplos aleatórios", logger)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Grid de exemplos aleatórios salvo em %s", out_path)
 
 
 def main() -> None:
-    # ``explore_dataset()`` já registra contagens e resolução média no log;
-    # repeti-las aqui só duplicaria as mesmas linhas.
     df = explore_dataset()
+    n_images = contar_imagens(config.IMAGES_DIR)
+    n_masks = contar_imagens(config.MASKS_DIR)
+
+    logger.info("Número de imagens: %d", n_images)
+    logger.info("Número de máscaras: %d", n_masks)
+    logger.info("Resolução média: %.0fx%.0f", df["altura"].mean(), df["largura"].mean())
+
     df.to_csv(config.REPORTS_DIR / "exploracao_dataset.csv", index=False)
     plot_area_distribution(df)
     plot_random_examples()

@@ -47,7 +47,7 @@ from hardware import (
 from measure import measure_wound, measure_wounds, measurements_to_row, wounds_to_rows
 from metrics import SegmentationMetrics, dice_coefficient
 from predict import load_model_from_checkpoint
-from utils import get_logger, save_figure
+from utils import get_logger
 
 logger = get_logger(__name__, config.LOGS_DIR / "evaluate.log")
 
@@ -117,7 +117,10 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, out_path: Path
     fig, ax = plt.subplots(figsize=(5, 5))
     ConfusionMatrixDisplay(cm, display_labels=["fundo", "ferida"]).plot(ax=ax, cmap="Blues", colorbar=False)
     ax.set_title("Matriz de Confusao (pixel-wise)")
-    save_figure(fig, out_path, "Matriz de confusao", logger)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Matriz de confusao salva em %s", out_path)
 
 
 def plot_roc_curve(y_true: np.ndarray, y_prob: np.ndarray, out_path: Path) -> None:
@@ -136,7 +139,10 @@ def plot_roc_curve(y_true: np.ndarray, y_prob: np.ndarray, out_path: Path) -> No
     ax.set_ylabel("Taxa de Verdadeiros Positivos")
     ax.set_title("Curva ROC")
     ax.legend()
-    save_figure(fig, out_path, "Curva ROC", logger)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Curva ROC salva em %s", out_path)
 
 
 def plot_precision_recall_curve(y_true: np.ndarray, y_prob: np.ndarray, out_path: Path) -> None:
@@ -148,7 +154,33 @@ def plot_precision_recall_curve(y_true: np.ndarray, y_prob: np.ndarray, out_path
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title("Curva Precision-Recall")
-    save_figure(fig, out_path, "Curva Precision-Recall", logger)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Curva Precision-Recall salva em %s", out_path)
+
+
+def plot_training_curves(history_csv: Path, out_path: Path) -> None:
+    """Etapa 13 - Plota curvas de treino/validacao (loss e dice) a partir do historico salvo por train.py."""
+    df = pd.read_csv(history_csv)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    axes[0].plot(df["epoch"], df["train_loss"], label="treino")
+    axes[0].plot(df["epoch"], df["val_loss"], label="validacao")
+    axes[0].set_title("Loss por epoca")
+    axes[0].set_xlabel("Epoca")
+    axes[0].legend()
+
+    axes[1].plot(df["epoch"], df["train_dice"], label="treino")
+    axes[1].plot(df["epoch"], df["val_dice"], label="validacao")
+    axes[1].set_title("Dice por epoca")
+    axes[1].set_xlabel("Epoca")
+    axes[1].legend()
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    logger.info("Curvas de treinamento salvas em %s", out_path)
 
 
 def evaluate_model(checkpoint_path: Path) -> Dict[str, float]:

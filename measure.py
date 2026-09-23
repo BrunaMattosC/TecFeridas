@@ -30,13 +30,13 @@ escala sozinho.
 
 from __future__ import annotations
 
-import argparse
 import math
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Sequence, Tuple, Union
 
 import cv2
 import numpy as np
+import pandas as pd
 
 import config
 from utils import draw_contour, get_logger, overlay_mask_on_image
@@ -191,33 +191,6 @@ def scale_from_options(
     if config.DEFAULT_PIXELS_POR_CM:
         return PixelScale.from_pixels_per_cm(config.DEFAULT_PIXELS_POR_CM)
     return None
-
-
-def adicionar_args_escala(parser: argparse.ArgumentParser) -> None:
-    """Registra em ``parser`` as opções de escala aceitas pelos CLIs.
-
-    Mantida junto de :func:`scale_from_options` para que as flags e sua
-    interpretação não possam divergir: ``predict`` e ``batch_inference``
-    expõem exatamente as mesmas opções.
-    """
-    parser.add_argument("--pixels-por-cm", type=float, default=None,
-                        help="Fator de escala pixels/cm (opcional).")
-    parser.add_argument("--pixels-por-mm", type=float, default=None,
-                        help="Fator de escala pixels/mm (opcional).")
-    parser.add_argument("--referencia-pixels", type=float, default=None,
-                        help="Tamanho, em pixels, de um objeto de referência na imagem.")
-    parser.add_argument("--referencia-cm", type=float, default=None,
-                        help="Tamanho real, em cm, do objeto de referência informado.")
-
-
-def scale_from_args(args: argparse.Namespace) -> Optional[PixelScale]:
-    """Constrói a :class:`PixelScale` a partir dos argumentos já parseados."""
-    return scale_from_options(
-        pixels_por_cm=args.pixels_por_cm,
-        pixels_por_mm=args.pixels_por_mm,
-        referencia_pixels=args.referencia_pixels,
-        referencia_cm=args.referencia_cm,
-    )
 
 
 # --------------------------------------------------------------------------- #
@@ -392,6 +365,24 @@ def _remove_small_components(mask: np.ndarray, cfg: config.MeasurementConfig) ->
     return keep[labels].astype(np.uint8)
 
 
+def _largest_component_mask(mask: np.ndarray) -> np.ndarray:
+    """Retorna uma máscara binária contendo apenas o maior componente conectado.
+
+    Args:
+        mask: máscara binária (0/1 ou 0/255).
+
+    Returns:
+        Máscara binária (0/1) com apenas o maior componente conectado.
+    """
+    mask_bin = _binarize(mask)
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
+    if num_labels <= 1:  # apenas o fundo
+        return mask_bin
+
+    largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+    return (labels == largest_label).astype(np.uint8)
+
+
 # --------------------------------------------------------------------------- #
 # Etapa 9b — Extração de características geométricas
 # --------------------------------------------------------------------------- #
@@ -550,24 +541,15 @@ def measure_wound(
         ValueError: se a máscara não contiver nenhum pixel de primeiro plano.
     """
     mask_bin = _binarize(mask)
+    total_pixels = mask_bin.shape[0] * mask_bin.shape[1]
 
-    # A checagem de máscara vazia vem antes da rotulação: é barata e evita
-    # percorrer a imagem inteira para depois descartar o resultado.
+    num_labels, _, _, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
+    num_components = max(num_labels - 1, 0)
+
     if mask_bin.sum() == 0:
         raise ValueError("Máscara vazia: nenhuma região de ferida encontrada.")
 
-    total_pixels = mask_bin.shape[0] * mask_bin.shape[1]
-
-    # Uma única passagem de componentes conectados serve aos dois usos:
-    # contar os componentes e isolar o maior. Antes, a imagem era rotulada
-    # duas vezes (aqui e dentro de um helper) para obter esses dois dados.
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask_bin, connectivity=8)
-    num_components = max(num_labels - 1, 0)
-
-    # Máscara não vazia sempre produz ao menos um componente além do fundo.
-    largest_label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
-    main_mask = (labels == largest_label).astype(np.uint8)
-
+    main_mask = _largest_component_mask(mask_bin)
     result = _measure_component(main_mask, total_pixels, num_components, wound_id=1)
     if result is None:  # pragma: no cover - máscara não vazia sempre gera contorno
         raise ValueError("Máscara vazia: nenhuma região de ferida encontrada.")
@@ -687,6 +669,21 @@ def _apply_scale(
 # --------------------------------------------------------------------------- #
 # Etapa 11 — Relatório tabular
 # --------------------------------------------------------------------------- #
+
+def build_measurement_report(records: List[dict]) -> pd.DataFrame:
+    """Etapa 11 — Monta o DataFrame de relatório por imagem.
+
+    Args:
+        records: lista de dicionários, cada um contendo ao menos
+            ``nome_imagem`` e os campos de :class:`WoundMeasurements`,
+            podendo incluir também ``iou`` e ``dice`` quando disponíveis
+            (comparação contra a máscara real).
+
+    Returns:
+        DataFrame pronto para ser salvo em CSV.
+    """
+    return pd.DataFrame(records)
+
 
 def measurements_to_row(image_name: str, measurements: WoundMeasurements, **extra) -> dict:
     """Converte um :class:`WoundMeasurements` em uma linha de DataFrame (dict).
