@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from utils import get_logger
+from utils import get_logger, ler_imagem
 
 # --------------------------------------------------------------------------- #
 # Import opcional da pilha de deep learning
@@ -224,9 +224,15 @@ def contar_imagens(pasta: Path) -> int:
                if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
 
 
-def list_image_mask_pairs() -> List[Tuple[Path, Path]]:
+def list_image_mask_pairs(
+    images_dir: Optional[Path] = None, masks_dir: Optional[Path] = None
+) -> List[Tuple[Path, Path]]:
     """Constrói a lista de pares (imagem, máscara) casando pelo nome
     base do arquivo (ignorando extensão e sufixos comuns de máscara).
+
+    Args:
+        images_dir: pasta das imagens; ``None`` usa ``config.IMAGES_DIR``.
+        masks_dir: pasta das máscaras; ``None`` usa ``config.MASKS_DIR``.
 
     Returns:
         Lista de tuplas ``(caminho_imagem, caminho_mascara)``.
@@ -234,12 +240,15 @@ def list_image_mask_pairs() -> List[Tuple[Path, Path]]:
     Raises:
         FileNotFoundError: se nenhuma imagem ou máscara for encontrada.
     """
-    images = sorted([p for p in config.IMAGES_DIR.glob("*") if p.suffix.lower() in IMAGE_EXTENSIONS])
-    masks = sorted([p for p in config.MASKS_DIR.glob("*") if p.suffix.lower() in IMAGE_EXTENSIONS])
+    images_dir = images_dir or config.IMAGES_DIR
+    masks_dir = masks_dir or config.MASKS_DIR
+
+    images = sorted([p for p in images_dir.glob("*") if p.suffix.lower() in IMAGE_EXTENSIONS])
+    masks = sorted([p for p in masks_dir.glob("*") if p.suffix.lower() in IMAGE_EXTENSIONS])
 
     if not images or not masks:
         raise FileNotFoundError(
-            f"Nenhuma imagem/máscara encontrada em {config.IMAGES_DIR} / {config.MASKS_DIR}. "
+            f"Nenhuma imagem/máscara encontrada em {images_dir} / {masks_dir}. "
             "Execute download_dataset() primeiro."
         )
 
@@ -277,7 +286,10 @@ class DatasetSplits:
 
 
 def split_dataset(
-    pairs: Optional[List[Tuple[Path, Path]]] = None, seed: int = config.SEED
+    pairs: Optional[List[Tuple[Path, Path]]] = None,
+    seed: int = config.SEED,
+    images_dir: Optional[Path] = None,
+    masks_dir: Optional[Path] = None,
 ) -> DatasetSplits:
     """Divide os pares imagem/máscara em treino (70%), validação (15%)
     e teste (15%) de forma determinística.
@@ -286,12 +298,16 @@ def split_dataset(
         pairs: lista de pares a dividir; se ``None``, é obtida via
             :func:`list_image_mask_pairs`.
         seed: seed usada para embaralhar antes de dividir.
+        images_dir: pasta das imagens quando ``pairs`` é ``None``;
+            ``None`` usa ``config.IMAGES_DIR``.
+        masks_dir: pasta das máscaras quando ``pairs`` é ``None``;
+            ``None`` usa ``config.MASKS_DIR``.
 
     Returns:
         Instância de :class:`DatasetSplits` com as três partições.
     """
     if pairs is None:
-        pairs = list_image_mask_pairs()
+        pairs = list_image_mask_pairs(images_dir, masks_dir)
 
     pairs = pairs.copy()
     rng = random.Random(seed)
@@ -383,12 +399,12 @@ class WoundDataset(Dataset):
     def __getitem__(self, idx: int):
         img_path, mask_path = self.pairs[idx]
 
-        image = cv2.imread(str(img_path))
+        image = ler_imagem(img_path)
         if image is None:
             raise FileNotFoundError(f"Falha ao ler imagem: {img_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             raise FileNotFoundError(f"Falha ao ler máscara: {mask_path}")
         mask = (mask > 127).astype(np.float32)
@@ -422,7 +438,7 @@ def explore_dataset(pairs: Optional[List[Tuple[Path, Path]]] = None) -> pd.DataF
 
     rows = []
     for img_path, mask_path in pairs:
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        mask = ler_imagem(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             continue
         h, w = mask.shape

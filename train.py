@@ -105,7 +105,11 @@ class EarlyStopping:
         return improved
 
 
-def build_dataloaders(device: torch.device | None = None) -> Dict[str, DataLoader]:
+def build_dataloaders(
+    device: torch.device | None = None,
+    images_dir: Path | None = None,
+    masks_dir: Path | None = None,
+) -> Dict[str, DataLoader]:
     """Cria os DataLoaders de treino, validação e teste a partir do split do dataset.
 
     O split (70/15/15, seed fixa) é exatamente o mesmo de antes. O que muda
@@ -116,9 +120,11 @@ def build_dataloaders(device: torch.device | None = None) -> Dict[str, DataLoade
     Args:
         device: dispositivo de destino; se ``None``, é resolvido via
             :func:`hardware.resolver_dispositivo`.
+        images_dir: pasta das imagens; ``None`` usa ``config.IMAGES_DIR``.
+        masks_dir: pasta das máscaras; ``None`` usa ``config.MASKS_DIR``.
     """
     device = device or resolver_dispositivo()
-    splits = split_dataset()
+    splits = split_dataset(images_dir=images_dir, masks_dir=masks_dir)
 
     train_ds = WoundDataset(splits.train, transform=get_train_transforms())
     val_ds = WoundDataset(splits.val, transform=get_eval_transforms())
@@ -443,6 +449,9 @@ def train_model(
     architecture: str | None = None,
     encoder_name: str | None = None,
     epochs: int | None = None,
+    images_dir: Path | None = None,
+    masks_dir: Path | None = None,
+    sufixo_run: str = "",
 ) -> Path:
     """Executa o pipeline completo de treinamento e retorna o caminho do melhor checkpoint.
 
@@ -450,6 +459,10 @@ def train_model(
         architecture: sobrescreve ``config.MODEL_CFG.architecture`` se informado.
         encoder_name: sobrescreve ``config.MODEL_CFG.encoder_name`` se informado.
         epochs: sobrescreve ``config.TRAIN_CFG.epochs`` se informado.
+        images_dir: pasta das imagens de treino; ``None`` usa ``config.IMAGES_DIR``.
+        masks_dir: pasta das máscaras de treino; ``None`` usa ``config.MASKS_DIR``.
+        sufixo_run: rótulo acrescentado ao nome da execução, para separar
+            checkpoints e histórico de treinos sobre fontes diferentes.
 
     Returns:
         Caminho do arquivo ``.pt`` contendo os pesos do melhor modelo.
@@ -460,7 +473,7 @@ def train_model(
     model_cfg, train_cfg = _resolver_configuracoes(architecture, encoder_name, epochs)
     device, usar_amp, amp_dtype = _preparar_dispositivo(model_cfg, train_cfg)
 
-    loaders = build_dataloaders(device)
+    loaders = build_dataloaders(device, images_dir=images_dir, masks_dir=masks_dir)
 
     # Modelo -> dispositivo, com conferência de que TODOS os parâmetros e
     # buffers foram de fato movidos.
@@ -482,7 +495,7 @@ def train_model(
     train_metrics = SegmentationMetrics(device)
     val_metrics = SegmentationMetrics(device)
 
-    run_name = f"{model_cfg.architecture}_{model_cfg.encoder_name}_{int(time.time())}"
+    run_name = f"{model_cfg.architecture}_{model_cfg.encoder_name}{sufixo_run}_{int(time.time())}"
     writer = SummaryWriter(log_dir=str(config.LOGS_DIR / "tensorboard" / run_name))
     best_ckpt_path = config.CHECKPOINTS_DIR / f"best_{run_name}.pt"
 
@@ -551,10 +564,28 @@ def train_model(
 
 
 if __name__ == "__main__":
+    import argparse
+
     from hardware import GPUIndisponivelError
 
+    parser = argparse.ArgumentParser(description="Treinamento do modelo de segmentação.")
+    parser.add_argument("--images-dir", type=str, default=None,
+                        help="Pasta das imagens de treino (padrão: dataset/images).")
+    parser.add_argument("--masks-dir", type=str, default=None,
+                        help="Pasta das máscaras de treino (padrão: dataset/masks).")
+    parser.add_argument("--sufixo-run", type=str, default="",
+                        help="Rótulo acrescentado ao nome da execução (ex.: _teccurar).")
+    parser.add_argument("--epochs", type=int, default=None,
+                        help="Sobrescreve config.TRAIN_CFG.epochs.")
+    args = parser.parse_args()
+
     try:
-        best_path = train_model()
+        best_path = train_model(
+            epochs=args.epochs,
+            images_dir=Path(args.images_dir) if args.images_dir else None,
+            masks_dir=Path(args.masks_dir) if args.masks_dir else None,
+            sufixo_run=args.sufixo_run,
+        )
     except GPUIndisponivelError as exc:
         # Falha explícita e imediata em vez de horas de treino em CPU que
         # ninguém pediu (item 9 do escopo).

@@ -47,6 +47,9 @@ logs/**
 # recriáveis com `python preparar_mascaras_teccurar.py`.
 dataset_teccurar/**
 
+# Fotos clínicas anotadas que originam o subconjunto acima.
+TecCurar_NewMasks/
+
 # Reinclui os diretórios e os marcadores .gitkeep para preservar a estrutura.
 !dataset/**/
 !checkpoints/**/
