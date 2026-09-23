@@ -1,0 +1,91 @@
+# ---------------------------------------------------------------------------
+# Ambiente virtual e dependências locais
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Testes, cobertura e análise estática
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------------------
+# Dados e artefatos gerados
+#
+# Todo o conteúdo destas pastas é recriável (ver README, "Passo 1 — Obter o
+# código"): dataset/ vem de `python dataset.py`, checkpoints/ de `python
+# train.py`, outputs/ e logs/ de cada execução. Somam mais de 1 GB.
+# Apenas a estrutura de diretórios é versionada, via arquivos .gitkeep.
+# ---------------------------------------------------------------------------
+dataset/**
+checkpoints/**
+outputs/**
+logs/**
+
+# Reinclui os diretórios e os marcadores .gitkeep para preservar a estrutura.
+!dataset/**/
+!checkpoints/**/
+!outputs/**/
+!logs/**/
+!**/.gitkeep
+
+# Pesos de modelo, caso sejam salvos fora de checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# ---------------------------------------------------------------------------
+# Imagens clínicas de pacientes
+#
+# Material fotográfico de feridas reais. Dado pessoal sensível: não deve sair
+# da máquina local em hipótese alguma.
+# ---------------------------------------------------------------------------
+Fotos TecFeridas/
+*.jpeg
+*.jpg
+*.mov
+*.mp4
+
+# ---------------------------------------------------------------------------
+# Credenciais e segredos
+# ---------------------------------------------------------------------------
+.env
+.env.*
+kaggle.json
+*.key
+*.pem
+*.pfx
+*.p12
+credentials.json
+secrets.json
+
+# ---------------------------------------------------------------------------
+# Editores e sistema operacional
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
