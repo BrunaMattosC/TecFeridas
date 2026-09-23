@@ -42,11 +42,17 @@ checkpoints/**
 outputs/**
 logs/**
 
+# Subconjunto derivado de TecCurar_NewMasks. As imagens são fotos clínicas
+# e as máscaras delas derivam, portanto também não saem da máquina. São
+# recriáveis com `python preparar_mascaras_teccurar.py`.
+dataset_teccurar/**
+
 # Reinclui os diretórios e os marcadores .gitkeep para preservar a estrutura.
 !dataset/**/
 !checkpoints/**/
 !outputs/**/
 !logs/**/
+!dataset_teccurar/**/
 !**/.gitkeep
 
 # Pesos de modelo, caso sejam salvos fora de checkpoints/
