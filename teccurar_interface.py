@@ -48,15 +48,18 @@ TITULO = "TecCurar — Análise de Feridas"
 LARGURA_VISTA = 320
 
 
-class AplicacaoTecCurar(tk.Tk):
-    """Janela principal."""
+class PainelAnalise(ttk.Frame):
+    """Painel de análise de uma fotografia.
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.title(TITULO)
-        self.geometry("1080x760")
-        self.minsize(960, 680)
+    É um ``Frame`` e não uma janela para que sirva tanto à janela autônoma
+    (:class:`AplicacaoTecCurar`) quanto a uma aba do painel de controle em
+    :mod:`teccurar_console`, sem duplicar a tela.
+    """
 
+    def __init__(self, mestre, com_cabecalho: bool = True) -> None:
+        super().__init__(mestre)
+
+        self._com_cabecalho = com_cabecalho
         self._caminho: Optional[Path] = None
         self._resultado: Optional[ResultadoAnalise] = None
         self._miniaturas: list = []   # evita coleta das imagens pelo Tk
@@ -65,15 +68,19 @@ class AplicacaoTecCurar(tk.Tk):
         self._verificar_modelo()
 
     # ------------------------------------------------------------------ #
-    # Construção da janela
+    # Construção da tela
     # ------------------------------------------------------------------ #
 
     def _montar(self) -> None:
-        cabecalho = ttk.Frame(self, padding=(14, 12, 14, 6))
-        cabecalho.pack(fill="x")
-        ttk.Label(cabecalho, text="TecCurar", font=("Segoe UI", 17, "bold")).pack(side="left")
-        ttk.Label(cabecalho, text="  segmentação e medição de feridas",
-                  foreground="#666666").pack(side="left", pady=(6, 0))
+        # Dentro do painel de controle o título já aparece na janela; repeti-lo
+        # na aba só roubaria altura das imagens.
+        if self._com_cabecalho:
+            cabecalho = ttk.Frame(self, padding=(14, 10, 14, 4))
+            cabecalho.pack(fill="x")
+            ttk.Label(cabecalho, text="TecCurar",
+                      font=("Segoe UI", 17, "bold")).pack(side="left")
+            ttk.Label(cabecalho, text="  segmentação e medição de feridas",
+                      foreground="#666666").pack(side="left", pady=(6, 0))
 
         barra = ttk.Frame(self, padding=(14, 4))
         barra.pack(fill="x")
@@ -334,8 +341,23 @@ class AplicacaoTecCurar(tk.Tk):
         self.status.config(text=texto, foreground="#b03a2e" if erro else "#444444")
 
 
+class AplicacaoTecCurar(tk.Tk):
+    """Janela autônoma com apenas a análise de fotografias.
+
+    Para gerenciar o projeto inteiro — preparar dados, treinar, avaliar —
+    use :mod:`teccurar_console`, que traz esta mesma tela como uma aba.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.title(TITULO)
+        self.geometry("1080x760")
+        self.minsize(960, 680)
+        PainelAnalise(self).pack(fill="both", expand=True)
+
+
 def main() -> int:
-    """Abre a janela do TecCurar."""
+    """Abre a janela de análise do TecCurar."""
     try:
         from PIL import Image  # noqa: F401  (usado em _pintar)
     except ImportError:
