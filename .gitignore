@@ -52,6 +52,17 @@ dataset_teccurar/**
 # Fotos clínicas anotadas que originam o subconjunto acima.
 TecCurar_NewMasks/
 
+# Fotografias das moedas de referência e tabela de dimensões oficiais.
+Moedas Parâmetro/
+
+# Saídas de calibração e comparação. O PDF e os recortes por imagem contêm
+# fotografias clínicas, e as máscaras derivam delas — nada disso sai da
+# máquina. Recriáveis com `python calibrar_moedas.py` seguido de
+# `python comparar_mascaras_relatorio.py`.
+Resultados/**
+!Resultados/**/
+!**/.gitkeep
+
 # Reinclui os diretórios e os marcadores .gitkeep para preservar a estrutura.
 !dataset/**/
 !checkpoints/**/
