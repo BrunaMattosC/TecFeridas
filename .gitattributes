@@ -1,0 +1,17 @@
+# Normaliza finais de linha dos arquivos de texto dentro do repositório.
+* text=auto
+
+# Arquivos binários: nunca converter finais de linha.
+# Esta máquina usa core.autocrlf=true; sem estas regras o Git trataria o PDF
+# como texto e trocaria LF por CRLF na checagem, corrompendo o arquivo.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.mov   binary
+*.mp4   binary
+*.xlsx  binary
+*.pth   binary
+*.pt    binary
+*.ckpt  binary
+*.onnx  binary
