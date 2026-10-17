@@ -63,6 +63,7 @@ class PainelAnalise(ttk.Frame):
         self._caminho: Optional[Path] = None
         self._resultado: Optional[ResultadoAnalise] = None
         self._miniaturas: list = []   # evita coleta das imagens pelo Tk
+        self._sem_modelo = False      # nenhum checkpoint na ultima verificacao
 
         self._montar()
         self._verificar_modelo()
@@ -90,6 +91,10 @@ class PainelAnalise(ttk.Frame):
         self.botao_relatorio = ttk.Button(barra, text="Gerar relatório",
                                           command=self._gerar_relatorio, state="disabled")
         self.botao_relatorio.pack(side="left", padx=(8, 0))
+        # Só aparece quando falta modelo: treinar é demorado e é comum deixar
+        # esta tela aberta enquanto o treinamento roda.
+        self.botao_reverificar = ttk.Button(barra, text="Procurar modelo novamente",
+                                            command=self._reverificar_modelo)
         self.rotulo_arquivo = ttk.Label(barra, text="Nenhuma imagem selecionada",
                                         foreground="#666666")
         self.rotulo_arquivo.pack(side="left", padx=(14, 0))
@@ -179,15 +184,62 @@ class PainelAnalise(ttk.Frame):
     # Estado do modelo
     # ------------------------------------------------------------------ #
 
-    def _verificar_modelo(self) -> None:
-        """Avisa na abertura se não houver modelo, em vez de falhar depois."""
+    def _verificar_modelo(self, avisar: bool = True) -> bool:
+        """Confere se há modelo treinado e ajusta a tela ao que encontrar.
+
+        A ausência de checkpoint nunca desabilita a tela em definitivo, só
+        até a próxima verificação: o modelo costuma aparecer depois que esta
+        tela foi aberta — treinar leva minutos, e o painel de controle roda o
+        treinamento com a análise já montada ao lado.
+
+        Args:
+            avisar: mostra o diálogo de aviso quando não há modelo. Fica em
+                ``False`` nas reconferências automáticas, que não devem
+                interromper o usuário.
+
+        Returns:
+            ``True`` se há um modelo disponível.
+        """
         try:
             caminho = localizar_checkpoint()
-            self._definir_status("Modelo carregado: %s" % caminho.name)
         except ErroTecCurar as erro:
+            self._sem_modelo = True
             self.botao_abrir.config(state="disabled")
+            self.botao_reverificar.pack(side="left", padx=(8, 0))
             self._definir_status("Nenhum modelo treinado disponível.", erro=True)
-            messagebox.showwarning("Modelo não disponível", str(erro))
+            if avisar:
+                messagebox.showwarning("Modelo não disponível", str(erro))
+            return False
+
+        self._sem_modelo = False
+        self.botao_abrir.config(state="normal")
+        self.botao_reverificar.pack_forget()
+        self._definir_status("Modelo disponível: %s" % caminho.name)
+        return True
+
+    def _reverificar_modelo(self) -> None:
+        """Procura o modelo de novo, a pedido do usuário."""
+        if self._verificar_modelo(avisar=False):
+            messagebox.showinfo(
+                "Modelo encontrado",
+                "Um modelo treinado foi encontrado. A análise de fotografias "
+                "já está disponível.")
+        else:
+            messagebox.showwarning(
+                "Modelo ainda não disponível",
+                "Continua não havendo nenhum modelo treinado em 'checkpoints'.\n\n"
+                "Conclua o treinamento — etapa 'Treinar o modelo' no painel de "
+                "controle, ou 'python train.py' — e procure novamente.")
+
+    def revalidar_modelo(self) -> None:
+        """Reconfere a disponibilidade do modelo, sem diálogos.
+
+        Chamada pelo painel de controle a cada volta à aba de análise. Só age
+        quando falta modelo, para não apagar da tela o resultado de uma
+        análise já concluída.
+        """
+        if self._sem_modelo:
+            self._verificar_modelo(avisar=False)
 
     # ------------------------------------------------------------------ #
     # Ações
@@ -335,7 +387,8 @@ class PainelAnalise(ttk.Frame):
         else:
             self.progresso.stop()
             self.progresso.pack_forget()
-            self.botao_abrir.config(state="normal")
+            if not self._sem_modelo:
+                self.botao_abrir.config(state="normal")
 
     def _definir_status(self, texto: str, erro: bool = False) -> None:
         self.status.config(text=texto, foreground="#b03a2e" if erro else "#444444")

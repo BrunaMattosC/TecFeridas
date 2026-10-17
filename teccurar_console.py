@@ -328,12 +328,18 @@ class ConsoleTecCurar(tk.Tk):
                                  "Abra manualmente:\n%s\n\nDetalhe: %s" % (pasta, erro))
 
     def _ao_trocar_aba(self, _evento) -> None:
-        """Monta a aba de análise só quando ela é aberta pela primeira vez.
+        """Monta a aba de análise na primeira abertura; nas demais, reconfere.
 
         Construí-la na abertura da janela custaria o carregamento do modelo
-        antes de o usuário pedir por ele.
+        antes de o usuário pedir por ele. E como o treinamento costuma rodar
+        por este mesmo painel, depois que a aba já existe, cada volta a ela
+        confere de novo se o checkpoint apareceu — sem isso a tela ficaria
+        dizendo que não há modelo até o painel ser reaberto.
         """
-        if self.abas.index("current") != 1 or self._painel_analise is not None:
+        if self.abas.index("current") != 1:
+            return
+        if self._painel_analise is not None:
+            self._painel_analise.revalidar_modelo()
             return
         try:
             from teccurar_interface import PainelAnalise
